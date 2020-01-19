@@ -1,18 +1,27 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const http = require('http');
 const routes = require('./routes');
+const { setupWebsocket } = require('./websocket')
 
 const app = express();
+const server = http.Server(app);
 
-mongoose.connect('mongodb+srv://<username>:<password>@nomedobanco-9q70m.mongodb.net/test?retryWrites=true&w=majority', {
+setupWebsocket(server);
+
+mongoose.connect('mongodb+srv://<user>:<pass>@omnistack-875.mongodb.net/week10omnistack?retryWrites=true&w=majority',
+{
   useNewUrlParser: true,
   useUnifiedTopology: true,
 });
 
-//mongoose.set('useCreateIndex', true);
+mongoose.set('useCreateIndex', true);
 
+// Define a mesma url de conexão para a api, web e mobile
 app.use(cors());
+
+// Define o express para JSON nas respostas
 app.use(express.json());
 app.use(routes);
 
@@ -27,4 +36,4 @@ app.use(routes);
 // MongoDB (não-relacional)
 
 
-app.listen(3333);
+server.listen(3333);
