@@ -16,10 +16,17 @@ async store (request, response) {
     let dev = await Dev.findOne({ github_username });
 
     if (!dev) {
+      try {
       // aguarda uma resposta antes de prosseguir
-      const apiResponse = await axios.get(`https://api.github.com/users/${github_username}`);
+      const apiResponse = await axios.get(`https://api.github.com/users/${github_username}`)
+      // Se o nome de usário não existe, apresenta o erro abaixo.
+        .catch(function (error) {
+          return response.status(404).json({ error: 'User does not exist on github.'});
+      });
+
 
       const { name = login, avatar_url, bio } = apiResponse.data;
+
 
       const techsArray = parseStringAsArray(techs);
 
@@ -47,11 +54,13 @@ async store (request, response) {
 
       sendMessage(sendSocketMessageTo, 'new-dev', dev);
 
-      console.log(sendSocketMessageTo);
-
       return response.json(dev);
+    } catch (error) {
+    return response.status(400).json({ error: 'Something did not work as expected.' })
     }
-
+    }else {
+      return response.status(400).json({ error: 'Developer already registered in DevRadar.' });
+    }
 
 },
 
