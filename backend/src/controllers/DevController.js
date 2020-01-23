@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import axios from 'axios';
 import Dev from '../models/Dev';
 import parseStringAsArray from '../utils/parseStringAsArray';
@@ -33,6 +34,7 @@ module.exports = {
           return response.json(apiResponse);
         }
 
+        // eslint-disable-next-line no-undef
         const { name = login, avatar_url, bio } = apiResponse.data;
 
         const techsArray = parseStringAsArray(techs);
@@ -42,6 +44,7 @@ module.exports = {
           coordinates: [longitude, latitude],
         };
 
+        // eslint-disable-next-line no-shadow
         const dev = await Dev.create({
           github_username,
           name,
@@ -94,7 +97,7 @@ module.exports = {
     // aguarda uma resposta antes de prosseguir
     const apiResponse = await axios
       .get(`https://api.github.com/users/${github_username}`)
-      .catch(error => {
+      .catch(_error => {
         // Se o nome de usário não existe, apresenta o erro abaixo.
 
         return response
@@ -106,7 +109,14 @@ module.exports = {
       return response.json(apiResponse);
     }
 
+    // eslint-disable-next-line no-undef
     const { name = login, avatar_url, bio } = apiResponse.data;
+
+    /* if (github_username === dados.nome) {
+      return response
+        .status(400)
+        .json({ error: 'Developer already registered in DevRadar.' });
+    } */
 
     const techsArray = parseStringAsArray(techs);
 
@@ -115,6 +125,7 @@ module.exports = {
       coordinates: [longitude, latitude],
     };
 
+    // eslint-disable-next-line no-unused-vars
     const devUpdated = await dev.updateOne({
       github_username,
       techs: techsArray,
