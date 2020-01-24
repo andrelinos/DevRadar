@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import axios from 'axios';
 import Dev from '../models/Dev';
 import parseStringAsArray from '../utils/parseStringAsArray';
@@ -87,7 +86,7 @@ module.exports = {
     }
   },
 
-  async update(request, response) {
+  async update(request, response, next) {
     const { id } = request.params;
 
     const { github_username, techs, latitude, longitude } = request.body;
@@ -119,12 +118,23 @@ module.exports = {
 
     const devExist = await Dev.findOne({ github_username });
 
+    console.log(`Log aquiiiiii${devExist._id}`);
+
     /** Verifica se já existe o nome na base de dados */
-    if (devExist) {
+    // eslint-disable-next-line no-underscore-dangle
+    if (devExist._id !== '5e2a3b1038982a4d590be422') {
+      if (devExist) {
+        return response
+          .status(400)
+          .json({ error: 'Developer already registered in DevRadar.' });
+      }
+      return next();
+    }
+    /* if ((devExist) {
       return response
         .status(400)
         .json({ error: 'Developer already registered in DevRadar.' });
-    }
+      } */
 
     const techsArray = parseStringAsArray(techs);
 
