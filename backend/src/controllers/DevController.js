@@ -7,7 +7,10 @@ import * as WebSocket from '../websocket';
 
 module.exports = {
   async index(request, response) {
-    const devs = await Dev.find();
+    const { quantity = 20 } = request.query;
+    const devs = await Dev.find()
+      .sort({ name: 1 })
+      .limit(quantity);
 
     return response.json(devs);
   },
@@ -86,6 +89,7 @@ module.exports = {
 
   async update(request, response) {
     const { id } = request.params;
+
     const { github_username, techs, latitude, longitude } = request.body;
 
     const dev = await Dev.findById(id);
@@ -94,7 +98,7 @@ module.exports = {
       return response.status(400).json({ error: 'Developer not found.' });
     }
 
-    // aguarda uma resposta antes de prosseguir
+    // Aguarda uma resposta antes de prosseguir
     const apiResponse = await axios
       .get(`https://api.github.com/users/${github_username}`)
       .catch(_error => {
@@ -109,14 +113,18 @@ module.exports = {
       return response.json(apiResponse);
     }
 
-    // eslint-disable-next-line no-undef
     const { name = login, avatar_url, bio } = apiResponse.data;
 
-    /* if (github_username === dados.nome) {
+    /** Lê o nome de usuário na base de dados para comparar com o novo */
+
+    const devExist = await Dev.findOne({ github_username });
+
+    /** Verifica se já existe o nome na base de dados */
+    if (devExist) {
       return response
         .status(400)
         .json({ error: 'Developer already registered in DevRadar.' });
-    } */
+    }
 
     const techsArray = parseStringAsArray(techs);
 
@@ -155,10 +163,16 @@ module.exports = {
   async delete(request, response) {
     const { id } = request.params;
 
-    const dev = await Dev.findById(id);
+    try {
+      const dev = await Dev.findById(id);
 
-    await dev.delete();
+      await dev.delete();
 
-    return response.status(200).json({ message: 'Developer deleted success.' });
+      return response
+        .status(200)
+        .json({ message: 'Developer deleted success.' });
+    } catch (error) {
+      return response.status(400).json({ error: 'Developer not found.' });
+    }
   },
 };
