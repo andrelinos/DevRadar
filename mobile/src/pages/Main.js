@@ -1,188 +1,196 @@
-import axios from 'axios';
-import Dev from '../models/Dev';
-import parseStringAsArray from '../utils/parseStringAsArray';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, Image, View, Text, TextInput } from 'react-native';
+import MapView, { Marker, Callout } from 'react-native-maps';
+import { requestPermissionsAsync, getCurrentPositionAsync } from 'expo-location';
+import { MaterialIcons } from '@expo/vector-icons';
+import { TouchableOpacity } from 'react-native-gesture-handler';
 
-import * as WebSocket from '../websocket';
+import api from '../services/api';
+import socket, { connect, disconnect, subscribeToNewDevs } from '../services/socket';
 
-module.exports = {
-  async index(request, response) {
-    const { quantity = 20 } = request.query;
-    const devs = await Dev.find()
-      .sort({ name: 1 })
-      .limit(quantity);
+function Main({ navigation }) {
+    const [devs, setDevs] = useState([]);
+    const [currentRegion, setCurrentRegion] = useState(null);
+    const [techs, setTechs] = useState('');
 
-    return response.json(devs);
-  },
+    useEffect(() => {
+        async function loadInitialPosition(){
+         const { granted } = await requestPermissionsAsync();
 
-  async store(request, response) {
-    const { github_username, techs, latitude, longitude } = request.body;
+         if (granted) {
+             const { coords } = await getCurrentPositionAsync({
+                 enableHighAccuracy: true,
+             });
 
-    const dev = await Dev.findOne({ github_username });
+             const { latitude, longitude } = coords;
 
-    if (!dev) {
-      try {
-        // aguarda uma resposta antes de prosseguir
-        const apiResponse = await axios
-          .get(`https://api.github.com/users/${github_username}`)
-          .catch(_error => {
-            // Se o nome de usário não existe, apresenta o erro abaixo.
+             setCurrentRegion({
+                 latitude,
+                 longitude,
+                 latitudeDelta: 0.04,
+                 longitudeDelta: 0.04,
+             })
+         }
+    }
+            
+        loadInitialPosition();
+    }, []);
 
-            return response
-              .status(404)
-              .json({ error: 'User does not exist on github.' });
-          });
+    useEffect(() => {
+        subscribeToNewDevs(dev => setDevs([...devs, dev]));
+    }, [devs]);
 
-        if (apiResponse.error) {
-          return response.json(apiResponse);
-        }
+    function setupWebsocket() {
+        disconnect();
+        const { latitude, longitude } = currentRegion;
 
-        // eslint-disable-next-line no-undef
-        const { name = login, avatar_url, bio } = apiResponse.data;
+        connect(
+            latitude,
+            longitude,
+            techs,
+        );
+    }
 
-        const techsArray = parseStringAsArray(techs);
+    async function loadDevs(){
+        const { latitude, longitude } = currentRegion;
 
-        const location = {
-          type: 'Point',
-          coordinates: [longitude, latitude],
-        };
-
-        // eslint-disable-next-line no-shadow
-        const dev = await Dev.create({
-          github_username,
-          name,
-          avatar_url,
-          bio,
-          techs: techsArray,
-          location,
+        const response = await api.get('/search', {
+            params: {
+                latitude,
+                longitude,
+                techs,
+            }
         });
 
-        // Filtrar conexões de websocket e procurar aquelas que estão a 10km máximo
-        // Que possuem pelo menos uma tech das filtradas
-
-        const sendSocketMessageTo = WebSocket.findConnections(
-          { latitude, longitude },
-          techsArray
-        );
-
-        WebSocket.sendMessage(sendSocketMessageTo, 'new-dev', dev);
-
-        return response.json([
-          github_username,
-          name,
-          techs,
-          bio,
-          latitude,
-          longitude,
-        ]);
-      } catch (error) {
-        return response
-          .status(400)
-          .json({ error: `Something did not work as expected.${error}` });
-      }
-    } else {
-      return response
-        .status(400)
-        .json({ error: 'Developer already registered in DevRadar.' });
-    }
-  },
-
-  async update(request, response, next) {
-    const { id } = request.params;
-
-    const { github_username, techs, latitude, longitude } = request.body;
-
-    const dev = await Dev.findById(id);
-
-    if (!dev) {
-      return response.status(400).json({ error: 'Developer not found.' });
+        setDevs(response.data.devs);
+        setupWebsocket();
     }
 
-    // Aguarda uma resposta antes de prosseguir
-    const apiResponse = await axios
-      .get(`https://api.github.com/users/${github_username}`)
-      .catch(_error => {
-        // Se o nome de usário não existe, apresenta o erro abaixo.
 
-        return response
-          .status(404)
-          .json({ error: 'User does not exist on github.' });
-      });
-
-    if (apiResponse.error) {
-      return response.json(apiResponse);
+    function handleRegionChanged(region){
+       // console.log(region);
+        setCurrentRegion(region);
     }
 
-    const { name = login, avatar_url, bio } = apiResponse.data;
-
-    /** Lê o nome de usuário na base de dados para comparar com o novo */
-
-    const devExist = await Dev.findOne({ github_username });
-
-    console.log(`Log aquiiiiii${devExist._id}`);
-
-    /** Verifica se já existe o nome na base de dados */
-    // eslint-disable-next-line no-underscore-dangle
-    if (devExist._id !== '5e2a3b1038982a4d590be422') {
-      if (devExist) {
-        return response
-          .status(400)
-          .json({ error: 'Developer already registered in DevRadar.' });
-      }
-      return next();
+    if(!currentRegion) {
+        return null;
     }
-    /* if ((devExist) {
-      return response
-        .status(400)
-        .json({ error: 'Developer already registered in DevRadar.' });
-      } */
 
-    const techsArray = parseStringAsArray(techs);
 
-    const location = {
-      type: 'Point',
-      coordinates: [longitude, latitude],
-    };
+    return(
+        <>
+           <MapView 
+            onRegionChangeComplete={handleRegionChanged}
+            initialRegion={currentRegion} 
+            style={styles.map}
+           >
+            {devs.map(dev => (
+                <Marker
+                key={dev._id}
+                coordinate={{ 
+                    latitude: dev.location.coordinates[1], 
+                    longitude: dev.location.coordinates[0]
+                    }}>   
+                <Image style={styles.avatar} source={{ uri: dev.avatar_url }}/>
+                <Callout onPress={() =>{
+                    // Navegation
+                    navigation.navigate('Profile', { github_username: dev.github_username });
+                }}>
+                    <View style={styles.callout}>
+                        <Text style={styles.devName}>{dev.name}</Text>
+                        <Text style={styles.devBio}>{dev.bio}</Text>
+                        <Text style={styles.devTechs}>{dev.techs.join(', ')}</Text>
+                    </View>
+                </Callout>
+            </Marker>
+            ))}
+        </MapView>
+           <View style={styles.searchForm}>
+             <TextInput 
+                style={styles.searchInput}
+                placeholder="Buscar devs por techs..."
+                placeholderTextColor="#999"
+                autoCapitalize="words"
+                autoCorrect={false}
+                value={techs}
+                onChangeText={setTechs}
+             />
 
-    // eslint-disable-next-line no-unused-vars
-    const devUpdated = await dev.updateOne({
-      github_username,
-      techs: techsArray,
-      location,
-      avatar_url,
-      name,
-      bio,
-    });
-
-    const sendSocketMessageTo = WebSocket.findConnections(
-      { latitude, longitude },
-      techsArray
+             <TouchableOpacity onPress={loadDevs} style={styles.loadButton}>
+                 <MaterialIcons name="my-location" size={20} color="#fff" />
+             </TouchableOpacity>
+           </View>
+        </>
     );
+}
 
-    WebSocket.sendMessage(sendSocketMessageTo, 'new-dev', dev);
+const styles = StyleSheet.create({
+    map: {
+        flex: 1
+    },
 
-    return response.json([
-      github_username,
-      techs,
-      location,
-      avatar_url,
-      name,
-      bio,
-    ]);
-  },
+    avatar: {
+        width: 54,
+        height: 54,
+        borderRadius: 4,
+        borderWidth: 4,
+        borderColor: '#fff'
+    },
 
-  async delete(request, response) {
-    const { id } = request.params;
+    callout: {
+        width: 260,
+        borderRadius: 4
+    },
 
-    try {
-      const dev = await Dev.findById(id);
+    devName: {
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
+    
+    devBio: {
+        color: '#999',
+        marginTop: 5,
+    },
 
-      await dev.delete();
+    devTechs: {
+        marginTop: 5
+    },
 
-      return response
-        .status(200)
-        .json({ message: 'Developer deleted success.' });
-    } catch (error) {
-      return response.status(400).json({ error: 'Developer not found.' });
+    searchForm: {
+        position: 'absolute',
+       top: 20,
+        left: 20,
+        right: 20,
+        zIndex: 5,
+        flexDirection: 'row',
+    },
+
+    searchInput: {
+        flex: 1,
+        height: 50,
+        backgroundColor: '#fff',
+        color: '#333',
+        borderRadius: 25,
+        paddingHorizontal: 20,
+        fontSize: 16,
+        shadowColor: '#000',
+        shadowOpacity: 0.2,
+        shadowOffset: {
+            width: 4,
+            height: 4,
+        },
+        elevation: 2,
+    },
+
+    loadButton: {
+        width: 50,
+        height: 50,
+        backgroundColor: '#8e4dff',
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginLeft: 15,
     }
-  },
-};
+})
+
+export default Main;
