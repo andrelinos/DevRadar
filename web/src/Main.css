@@ -2,6 +2,15 @@ main {
   flex: 1;
 }
 
+@media (min-width:1001px) {
+  main {
+    padding-left: 320px;
+  }
+  aside {
+    position: fixed;
+    top: 60px
+  }
+}
 main ul {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

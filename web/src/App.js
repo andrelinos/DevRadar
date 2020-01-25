@@ -3,7 +3,7 @@ import api from './services/api';
 
 import './global.css';
 import './App.css';
-import './Sidebar.css';
+
 import './Main.css';
 
 import DevForm from './components/DevForm';
@@ -29,19 +29,22 @@ function App() {
   }
 
   return (
-    <div id="app">
-      <aside>
-        <strong>Cadastrar</strong>
-        <DevForm onSubmit={handleAddDev} />
-      </aside>
-      <main>
-        <ul>
-          {devs.map(dev => (
-            <DevItem key={dev._id} dev={dev} />
-          ))}
-        </ul>
-      </main>
-    </div>
+    <>
+      <div className="dev-radar-logo">Dev Radar</div>
+      <div id="app">
+        <aside>
+          <strong>Cadastrar</strong>
+          <DevForm onSubmit={handleAddDev} />
+        </aside>
+        <main>
+          <ul>
+            {devs.map(dev => (
+              <DevItem key={dev._id} dev={dev} />
+            ))}
+          </ul>
+        </main>
+      </div>
+    </>
   );
 }
 
