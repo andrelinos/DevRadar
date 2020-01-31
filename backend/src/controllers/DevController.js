@@ -25,8 +25,8 @@ module.exports = {
         const apiResponse = await axios
           .get(`https://api.github.com/users/${github_username}`)
           .catch(_error => {
+            
             // Se o nome de usário não existe, apresenta o erro abaixo.
-
             return response
               .status(404)
               .json({ error: 'User does not exist on github.' });
@@ -115,7 +115,6 @@ module.exports = {
     const { name = login, avatar_url, bio } = apiResponse.data;
 
     /** Lê o nome de usuário na base de dados para comparar com o novo */
-
     const devExist = await Dev.findOne({ github_username });
 
     console.log(`Log aquiiiiii${devExist._id}`);
